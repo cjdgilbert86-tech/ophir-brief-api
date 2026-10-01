@@ -172,10 +172,15 @@ def pipeline(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query
 
 
 @app.get("/newsletter-pipeline")
-def newsletter_pipeline(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
-    """First Meeting through Agreement Drafting — slim fields."""
+def newsletter_pipeline(
+    stage: Optional[str] = Query(None, description="Filter to a single stage, e.g. 'Diligence'"),
+    x_api_key: Optional[str] = Header(None),
+    key: Optional[str] = Query(None),
+):
+    """First Meeting through Agreement Drafting — slim fields. Pass ?stage= to filter to one stage."""
     verify(x_api_key, key)
-    return get_pipeline_by_stages(NEWSLETTER_STAGES, slim=True)
+    stages = {stage} if stage and stage in NEWSLETTER_STAGES else NEWSLETTER_STAGES
+    return get_pipeline_by_stages(stages, slim=True)
 
 
 @app.get("/passed-this-month")
