@@ -27,30 +27,42 @@ def get_connection():
 
 def get_tab(tab_name: str) -> list[dict]:
     """
-    Pivots sheet_cell rows into a list of dicts, one per row_idx.
-    Each dict has col_name → value pairs.
+    Reads sheet_cell for the given tab.
+    The lowest row_idx is treated as the header row (col_idx -> column name).
+    All subsequent rows are returned as dicts keyed by column name.
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT row_idx, col_name, value
-                FROM sheet_cell
-                WHERE tab = %s
-                ORDER BY row_idx, col_name
-                """,
+                "SELECT row_idx, col_idx, val FROM sheet_cell WHERE tab = %s ORDER BY row_idx, col_idx",
                 (tab_name,),
             )
             rows = cur.fetchall()
 
-        grouped: dict[int, dict] = {}
-        for row_idx, col_name, value in rows:
-            if row_idx not in grouped:
-                grouped[row_idx] = {}
-            grouped[row_idx][col_name] = value
+        if not rows:
+            return []
 
-        return list(grouped.values())
+        # The first row_idx holds the column headers
+        min_row = min(r[0] for r in rows)
+
+        # Build header map: col_idx -> column name
+        headers: dict[int, str] = {}
+        for row_idx, col_idx, val in rows:
+            if row_idx == min_row:
+                headers[col_idx] = val or f"col_{col_idx}"
+
+        # Build data rows, skipping the header row
+        data: dict[int, dict] = {}
+        for row_idx, col_idx, val in rows:
+            if row_idx == min_row:
+                continue
+            if row_idx not in data:
+                data[row_idx] = {}
+            col_name = headers.get(col_idx, f"col_{col_idx}")
+            data[row_idx][col_name] = val
+
+        return list(data.values())
     finally:
         conn.close()
 
