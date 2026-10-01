@@ -70,7 +70,7 @@ def get_tab(tab_name: str) -> list[dict]:
 # --- Endpoints ---
 @app.get("/health")
 def health():
-    """Public health check — no auth required."""
+    """Public health check - no auth required."""
     return {"status": "ok", "service": "ophir-brief-api"}
 
 
