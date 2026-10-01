@@ -1,7 +1,6 @@
 import os
 import psycopg2
-from fastapi import FastAPI, HTTPException, Header
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Header, Query
 from typing import Optional
 
 # --- Config ---
@@ -12,8 +11,10 @@ app = FastAPI(title="Ophir Brief API", docs_url=None, redoc_url=None)
 
 
 # --- Auth ---
-def verify(x_api_key: Optional[str] = Header(None)):
-    if not API_KEY or x_api_key != API_KEY:
+# Accepts the key via header (x-api-key: ...) or query param (?key=...)
+def verify(header_key: Optional[str], query_key: Optional[str]):
+    provided = header_key or query_key
+    if not API_KEY or provided != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -62,48 +63,48 @@ def health():
 
 
 @app.get("/pipeline")
-def pipeline(x_api_key: Optional[str] = Header(None)):
-    verify(x_api_key)
+def pipeline(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
+    verify(x_api_key, key)
     return get_tab("Pipeline")
 
 
 @app.get("/quotes")
-def quotes(x_api_key: Optional[str] = Header(None)):
-    verify(x_api_key)
+def quotes(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
+    verify(x_api_key, key)
     return get_tab("Quotes")
 
 
 @app.get("/themes")
-def themes(x_api_key: Optional[str] = Header(None)):
-    verify(x_api_key)
+def themes(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
+    verify(x_api_key, key)
     return get_tab("Themes")
 
 
 @app.get("/themes-detail")
-def themes_detail(x_api_key: Optional[str] = Header(None)):
-    verify(x_api_key)
+def themes_detail(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
+    verify(x_api_key, key)
     return get_tab("ThemesEntries")
 
 
 @app.get("/meetings")
-def meetings(x_api_key: Optional[str] = Header(None)):
-    verify(x_api_key)
+def meetings(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
+    verify(x_api_key, key)
     return get_tab("Meetings")
 
 
 @app.get("/hypotheses")
-def hypotheses(x_api_key: Optional[str] = Header(None)):
-    verify(x_api_key)
+def hypotheses(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
+    verify(x_api_key, key)
     return get_tab("Hypotheses")
 
 
 @app.get("/newsletter")
-def newsletter(x_api_key: Optional[str] = Header(None)):
+def newsletter(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
     """
     Single endpoint that returns everything needed to write an issue.
     Fetch this at the start of each newsletter session.
     """
-    verify(x_api_key)
+    verify(x_api_key, key)
     return {
         "pipeline": get_tab("Pipeline"),
         "quotes": get_tab("Quotes"),
