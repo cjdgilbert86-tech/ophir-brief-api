@@ -11,7 +11,6 @@ app = FastAPI(title="Ophir Brief API", docs_url=None, redoc_url=None)
 
 
 # --- Auth ---
-# Accepts the key via header (x-api-key: ...) or query param (?key=...)
 def verify(header_key: Optional[str], query_key: Optional[str]):
     provided = header_key or query_key
     if not API_KEY or provided != API_KEY:
@@ -20,17 +19,11 @@ def verify(header_key: Optional[str], query_key: Optional[str]):
 
 # --- DB helpers ---
 def get_connection():
-    # Railway sometimes issues postgres:// — psycopg2 needs postgresql://
     url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     return psycopg2.connect(url)
 
 
 def get_tab(tab_name: str) -> list[dict]:
-    """
-    Reads sheet_cell for the given tab.
-    The lowest row_idx is treated as the header row (col_idx -> column name).
-    All subsequent rows are returned as dicts keyed by column name.
-    """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -43,16 +36,13 @@ def get_tab(tab_name: str) -> list[dict]:
         if not rows:
             return []
 
-        # The first row_idx holds the column headers
         min_row = min(r[0] for r in rows)
 
-        # Build header map: col_idx -> column name
         headers: dict[int, str] = {}
         for row_idx, col_idx, val in rows:
             if row_idx == min_row:
                 headers[col_idx] = val or f"col_{col_idx}"
 
-        # Build data rows, skipping the header row
         data: dict[int, dict] = {}
         for row_idx, col_idx, val in rows:
             if row_idx == min_row:
@@ -70,8 +60,31 @@ def get_tab(tab_name: str) -> list[dict]:
 # --- Endpoints ---
 @app.get("/health")
 def health():
-    """Public health check - no auth required."""
-    return {"status": "ok", "service": "ophir-brief-api"}
+    """Public health check with DB ping."""
+    db_status = "unknown"
+    db_error = None
+    api_key_set = bool(API_KEY)
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM sheet_cell LIMIT 1")
+            count = cur.fetchone()[0]
+        conn.close()
+        db_status = "ok"
+        db_rows = count
+    except Exception as e:
+        db_status = "error"
+        db_error = str(e)
+        db_rows = None
+
+    return {
+        "status": "ok",
+        "service": "ophir-brief-api",
+        "db": db_status,
+        "db_error": db_error,
+        "db_rows": db_rows,
+        "api_key_set": api_key_set,
+    }
 
 
 @app.get("/pipeline")
@@ -112,10 +125,6 @@ def hypotheses(x_api_key: Optional[str] = Header(None), key: Optional[str] = Que
 
 @app.get("/newsletter")
 def newsletter(x_api_key: Optional[str] = Header(None), key: Optional[str] = Query(None)):
-    """
-    Single endpoint that returns everything needed to write an issue.
-    Fetch this at the start of each newsletter session.
-    """
     verify(x_api_key, key)
     return {
         "pipeline": get_tab("Pipeline"),
